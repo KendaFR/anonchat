@@ -2,29 +2,32 @@ import { useState } from 'react'
 import { Analytics } from '@vercel/analytics/react'
 import { useSession } from './hooks/useSession'
 import OnboardingScreen from './components/OnboardingScreen'
-import ChatScreen from './components/ChatScreen'
-import ProfileScreen from './components/ProfileScreen'
+import FeedScreen      from './components/FeedScreen'
+import ThreadScreen    from './components/ThreadScreen'
+import ProfileScreen   from './components/ProfileScreen'
 import EditProfileScreen from './components/EditProfileScreen'
 import './App.css'
 
 export default function App() {
   const { profile, setProfile, saveProfile, clearProfile, loading } = useSession()
-  const [screen, setScreen] = useState('chat') // 'chat' | 'profile' | 'edit'
+  const [screen, setScreen]         = useState('feed')       // feed | thread | profile | edit
+  const [activeThread, setActiveThread] = useState(null)     // objet thread sélectionné
 
-  // Écran de chargement pendant la vérification de session
   if (loading) {
     return (
-      <div className="app-container">
-        <div className="splash">
-          <div className="splash-emoji">💬</div>
-          <div className="splash-text">Chargement…</div>
-        </div>
-        <Analytics />
-      </div>
-    )
+  <div className="app-container">
+    {loading ? (
+      <SplashScreen />
+    ) : !profile ? (
+      <OnboardingScreen onJoin={saveProfile} />
+    ) : (
+      <AppContent ... />
+    )}
+    <Analytics />
+  </div>
+)
   }
 
-  // Pas de profil → onboarding
   if (!profile) {
     return (
       <div className="app-container">
@@ -34,18 +37,31 @@ export default function App() {
     )
   }
 
+  function openThread(thread) {
+    setActiveThread(thread)
+    setScreen('thread')
+  }
+
   return (
     <div className="app-container">
-      {screen === 'chat' && (
-        <ChatScreen
+      {screen === 'feed' && (
+        <FeedScreen
           profile={profile}
+          onOpenThread={openThread}
           onOpenProfile={() => setScreen('profile')}
+        />
+      )}
+      {screen === 'thread' && (
+        <ThreadScreen
+          thread={activeThread}
+          profile={profile}
+          onBack={() => setScreen('feed')}
         />
       )}
       {screen === 'profile' && (
         <ProfileScreen
           profile={profile}
-          onBack={() => setScreen('chat')}
+          onBack={() => setScreen('feed')}
           onEdit={() => setScreen('edit')}
           onDelete={clearProfile}
         />

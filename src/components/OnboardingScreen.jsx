@@ -11,13 +11,14 @@ export const PASSIONS = [
   { id: 'sport',   label: 'Sport',       icon: '⚽' },
   { id: 'cinema',  label: 'Cinéma',      icon: '🎬' },
   { id: 'cuisine', label: 'Cuisine',     icon: '🍳' },
-  { id: 'voyages', label: 'Voyages',     icon: '✈️' },
+  { id: 'voyages', label: 'Voyages',     icon: '✈️'  },
   { id: 'tech',    label: 'Tech / Dev',  icon: '💻' },
   { id: 'lecture', label: 'Lecture',     icon: '📚' },
   { id: 'nature',  label: 'Nature',      icon: '🌿' },
   { id: 'photo',   label: 'Photo',       icon: '📷' },
   { id: 'animaux', label: 'Animaux',     icon: '🐾' },
 ]
+export { EMOJIS, COLORS }
 
 export default function OnboardingScreen({ onJoin }) {
   const [emoji, setEmoji]       = useState(null)
@@ -28,76 +29,58 @@ export default function OnboardingScreen({ onJoin }) {
 
   function togglePassion(id) {
     setPassions(prev =>
-      prev.includes(id)
-        ? prev.filter(p => p !== id)
+      prev.includes(id) ? prev.filter(p => p !== id)
         : prev.length < 4 ? [...prev, id] : prev
     )
   }
 
   async function handleJoin() {
     if (!emoji || passions.length === 0) return
-    setLoading(true)
-    setError(null)
-
+    setLoading(true); setError(null)
     const color = COLORS[EMOJIS.indexOf(emoji) % COLORS.length]
-
     try {
       const { data, error: err } = await supabase
         .from('profiles')
-        .insert({ emoji, age, passions, color })
-        .select()
-        .single()
-
+        .insert({ emoji, age, passions, color, show_presence: true })
+        .select().single()
       if (err) throw err
       onJoin(data)
     } catch (e) {
-      setError('Erreur de connexion. Vérifie ta connexion internet.')
-      console.error(e)
+      setError('Erreur de connexion. Vérifie ta connexion.')
     } finally {
       setLoading(false)
     }
   }
 
-  const canJoin = emoji && passions.length > 0
-
   return (
     <div className="screen onboard-screen">
       <div className="onboard-inner">
         <h1>Chat anonyme</h1>
-        <p className="subtitle">Crée ton profil anonyme pour rejoindre la salle.</p>
+        <p className="subtitle">Crée ton profil pour rejoindre le feed.</p>
 
         <section>
           <label>Choisis ton avatar</label>
           <div className="emoji-grid">
             {EMOJIS.map(e => (
-              <button
-                key={e}
-                className={`emoji-opt ${emoji === e ? 'sel' : ''}`}
-                onClick={() => setEmoji(e)}
-              >{e}</button>
+              <button key={e} className={`emoji-opt ${emoji === e ? 'sel' : ''}`}
+                onClick={() => setEmoji(e)}>{e}</button>
             ))}
           </div>
         </section>
 
         <section>
-          <label>
-            Ton âge — <strong>{age} ans</strong>
-          </label>
-          <input
-            type="range" min="13" max="80" value={age}
-            onChange={e => setAge(parseInt(e.target.value))}
-          />
+          <label>Ton âge — <strong>{age} ans</strong></label>
+          <input type="range" min="13" max="80" value={age}
+            onChange={e => setAge(parseInt(e.target.value))} />
         </section>
 
         <section>
           <label>Tes passions <span className="hint">(jusqu'à 4)</span></label>
           <div className="passion-grid">
             {PASSIONS.map(p => (
-              <button
-                key={p.id}
+              <button key={p.id}
                 className={`passion-opt ${passions.includes(p.id) ? 'sel' : ''}`}
-                onClick={() => togglePassion(p.id)}
-              >
+                onClick={() => togglePassion(p.id)}>
                 <span>{p.icon}</span> {p.label}
               </button>
             ))}
@@ -105,13 +88,9 @@ export default function OnboardingScreen({ onJoin }) {
         </section>
 
         {error && <p className="error-msg">{error}</p>}
-
-        <button
-          className="btn-primary"
-          disabled={!canJoin || loading}
-          onClick={handleJoin}
-        >
-          {loading ? 'Connexion…' : 'Rejoindre le chat'}
+        <button className="btn-primary" disabled={!emoji || passions.length === 0 || loading}
+          onClick={handleJoin}>
+          {loading ? 'Connexion…' : 'Rejoindre le feed'}
         </button>
       </div>
     </div>
