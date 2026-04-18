@@ -1,8 +1,13 @@
-export default function ThreadCard({ thread, stats, isMe, onClick }) {
+export default function ThreadCard({ thread, stats, isMe, myVote, onVote, onClick }) {
   const author = thread.profiles
-  const time = new Date(thread.created_at).toLocaleString('fr-FR', {
+  const score  = Number(stats.vote_score ?? 0)
+  const time   = new Date(thread.created_at).toLocaleString('fr-FR', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
   })
+
+  function handleVoteClick(e, val) { e.stopPropagation(); onVote(val) }
+
+  const scoreColor = score > 0 ? 'var(--green)' : score < 0 ? 'var(--red)' : 'var(--text-muted)'
 
   return (
     <div className={`thread-card ${isMe ? 'mine' : ''}`} onClick={onClick}>
@@ -22,6 +27,28 @@ export default function ThreadCard({ thread, stats, isMe, onClick }) {
       <p className="thread-content">{thread.content}</p>
 
       <div className="thread-footer">
+        <div className="vote-group" onClick={e => e.stopPropagation()}>
+          <button className={`vote-btn up ${myVote === 1 ? 'active' : ''}`}
+            onClick={e => handleVoteClick(e, 1)} title="Upvote">
+            <svg width="13" height="13" viewBox="0 0 24 24"
+              fill={myVote === 1 ? 'currentColor' : 'none'}
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+          </button>
+          <span className="vote-score" style={{ color: scoreColor }}>
+            {score > 0 ? `+${score}` : score}
+          </span>
+          <button className={`vote-btn down ${myVote === -1 ? 'active' : ''}`}
+            onClick={e => handleVoteClick(e, -1)} title="Downvote">
+            <svg width="13" height="13" viewBox="0 0 24 24"
+              fill={myVote === -1 ? 'currentColor' : 'none'}
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+        </div>
+
         <span className="thread-stat">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -34,11 +61,10 @@ export default function ThreadCard({ thread, stats, isMe, onClick }) {
             stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
-          {stats.participant_count} participant{stats.participant_count !== 1 ? 's' : ''}
+          {stats.participant_count}
         </span>
-        <span className="thread-reply-cta">Répondre →</span>
+        <span className="thread-reply-cta">Voir →</span>
       </div>
     </div>
   )
