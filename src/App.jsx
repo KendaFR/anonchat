@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { useSession } from './hooks/useSession'
 import OnboardingScreen from './components/OnboardingScreen'
 import FeedScreen      from './components/FeedScreen'
@@ -14,16 +15,24 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="app-container">
-        <div className="splash"><div className="splash-emoji">💬</div><div className="splash-text">Chargement…</div></div>
-      </div>
-    )
+  <div className="app-container">
+    {loading ? (
+      <SplashScreen />
+    ) : !profile ? (
+      <OnboardingScreen onJoin={saveProfile} />
+    ) : (
+      <AppContent ... />
+    )}
+    <Analytics />
+  </div>
+)
   }
 
   if (!profile) {
     return (
       <div className="app-container">
         <OnboardingScreen onJoin={saveProfile} />
+        <Analytics />
       </div>
     )
   }
@@ -64,6 +73,7 @@ export default function App() {
           onBack={() => setScreen('profile')}
         />
       )}
+      <Analytics />
     </div>
   )
 }
