@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import ThreadCard from './ThreadCard'
+import ReportModal from './ReportModal'
 
 const TABS             = ['Récents', 'Discutés', 'Populaires']
 const REFRESH_INTERVAL = 5 * 60 * 1000
 
-export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unreadCount, onOpenNotifs }) {
+export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unreadCount, onOpenNotifs, onOpenAdmin }) {
   const [threads, setThreads]             = useState([])
   const [stats, setStats]                 = useState({})
   const [myVotes, setMyVotes]             = useState({})
@@ -17,6 +18,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
   const [lastRefresh, setLastRefresh]     = useState(new Date())
   const [refreshing, setRefreshing]       = useState(false)
   const [lowScoreAlert, setLowScoreAlert] = useState(null)
+  const [reportTarget, setReportTarget]   = useState(null) // { threadId } | null
   const presenceChannel = useRef(null)
   const refreshTimer    = useRef(null)
 
@@ -46,6 +48,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
     }
   }, [stats, threads])
 
+  // ─── Chargement ───────────────────────────────────────────────────────
   async function loadAll() {
     setRefreshing(true)
     await Promise.all([loadThreads(), loadMyVotes()])
@@ -70,6 +73,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
     if (data) { const m = {}; data.forEach(v => { m[v.thread_id] = v.value }); setMyVotes(m) }
   }
 
+  // ─── Auto-refresh ─────────────────────────────────────────────────────
   function scheduleAutoRefresh() {
     refreshTimer.current = setTimeout(() => { loadAll(); scheduleAutoRefresh() }, REFRESH_INTERVAL)
   }
@@ -77,6 +81,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
     clearTimeout(refreshTimer.current); loadAll(); scheduleAutoRefresh()
   }
 
+  // ─── Realtime ─────────────────────────────────────────────────────────
   function subscribeThreads() {
     return supabase.channel('feed-threads')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'threads' },
@@ -115,6 +120,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
       .subscribe()
   }
 
+  // ─── Vote avec optimistic update ─────────────────────────────────────
   async function handleVote(threadId, value) {
     const current  = myVotes[threadId] || 0
     const isCancel = current === value
@@ -143,13 +149,14 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
     }
   }
 
+  // ─── Poster un thread ─────────────────────────────────────────────────
   async function handlePost() {
     const content = newText.trim()
     if (!content || posting) return
     setPosting(true)
     const { data: thread } = await supabase
       .from('threads').insert({ profile_id: profile.id, content }).select().single()
-    // L'auteur devient automatiquement @0 à la création du thread
+    // L'auteur devient @0 immédiatement à la création
     if (thread) {
       await supabase.from('thread_participants').insert({
         thread_id: thread.id, profile_id: profile.id, participant_number: 0
@@ -163,6 +170,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
     setLowScoreAlert(null)
   }
 
+  // ─── Tri ──────────────────────────────────────────────────────────────
   const sortedThreads = useCallback(() => {
     return [...threads].sort((a, b) => {
       const sa = stats[a.id] || { reply_count: 0, vote_score: 0, replies_24h: 0 }
@@ -181,37 +189,52 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
     return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   }
 
+  // ─── Présence ─────────────────────────────────────────────────────────
   function setupPresence() {
-    presenceChannel.current = supabase.channel('online-users', { config: { presence: { key: profile.id } } })
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.current.presenceState()
-        let count = 0
-        Object.values(state).forEach(ps => { ps.forEach(p => { if (p.show_presence !== false) count++ }) })
-        setOnlineCount(count)
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.current.track({ profile_id: profile.id, show_presence: profile.show_presence })
-        }
-      })
+    presenceChannel.current = supabase.channel('online-users', {
+      config: { presence: { key: profile.id } }
+    })
+    .on('presence', { event: 'sync' }, () => {
+      const state = presenceChannel.current.presenceState()
+      let count = 0
+      Object.values(state).forEach(ps => { ps.forEach(p => { if (p.show_presence !== false) count++ }) })
+      setOnlineCount(count)
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel.current.track({ profile_id: profile.id, show_presence: profile.show_presence })
+      }
+    })
   }
 
   return (
     <div className="screen feed-screen">
-      <div className="feed-header">
-        {/* Gauche : cloche notifications */}
-        <button className="notif-bell-btn" onClick={onOpenNotifs}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          {unreadCount > 0 && (
-            <span className="notif-bell-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
-          )}
-        </button>
 
-        {/* Centre : titre */}
+      {/* ── Header ── */}
+      <div className="feed-header">
+        {/* Gauche : cloche + bouton admin si applicable */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button className="notif-bell-btn" onClick={onOpenNotifs}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            {unreadCount > 0 && (
+              <span className="notif-bell-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+            )}
+          </button>
+          {onOpenAdmin && (
+            <button className="admin-open-btn" onClick={onOpenAdmin} title="Panel de modération">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Centre : titre + connectés */}
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div className="feed-title">Feed public</div>
           <div className="online-info" style={{ justifyContent: 'center' }}>
@@ -222,7 +245,8 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
 
         {/* Droite : refresh + avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button className={`btn-refresh ${refreshing ? 'spinning' : ''}`}
+          <button
+            className={`btn-refresh ${refreshing ? 'spinning' : ''}`}
             onClick={handleManualRefresh} disabled={refreshing}
             title={`Rafraîchi ${formatRefreshTime(lastRefresh)}`}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -237,6 +261,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
         </div>
       </div>
 
+      {/* ── Alerte score bas ── */}
       {lowScoreAlert && (
         <div className="low-score-alert">
           <div className="low-score-icon">⚠️</div>
@@ -251,15 +276,21 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
         </div>
       )}
 
+      {/* ── Composer ── */}
       {showCompose ? (
         <div className="compose-box">
-          <textarea className="compose-input" value={newText}
+          <textarea
+            className="compose-input" value={newText}
             onChange={e => setNewText(e.target.value)}
-            placeholder="Quoi de neuf ? Lance un sujet…" maxLength={500} autoFocus rows={3} />
+            placeholder="Quoi de neuf ? Lance un sujet…"
+            maxLength={500} autoFocus rows={3}
+          />
           <div className="compose-actions">
             <span className="char-count">{newText.length}/500</span>
-            <button className="btn-ghost-sm" onClick={() => { setShowCompose(false); setNewText('') }}>Annuler</button>
-            <button className="btn-primary-sm" disabled={!newText.trim() || posting} onClick={handlePost}>
+            <button className="btn-ghost-sm"
+              onClick={() => { setShowCompose(false); setNewText('') }}>Annuler</button>
+            <button className="btn-primary-sm"
+              disabled={!newText.trim() || posting} onClick={handlePost}>
               {posting ? '…' : 'Publier'}
             </button>
           </div>
@@ -271,9 +302,12 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
         </button>
       )}
 
+      {/* ── Onglets de tri ── */}
       <div className="feed-tabs">
         {TABS.map(tab => (
-          <button key={tab} className={`feed-tab ${activeTab === tab ? 'active' : ''}`}
+          <button
+            key={tab}
+            className={`feed-tab ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}>{tab}</button>
         ))}
         <div className="refresh-hint">
@@ -281,6 +315,7 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
         </div>
       </div>
 
+      {/* ── Liste threads ── */}
       <div className="feed-list">
         {threads.length === 0 && !refreshing && (
           <div className="empty-feed">
@@ -290,15 +325,31 @@ export default function FeedScreen({ profile, onOpenThread, onOpenProfile, unrea
         )}
         {sortedThreads().map(thread => (
           <ThreadCard
-            key={thread.id} thread={thread}
+            key={thread.id}
+            thread={thread}
             stats={stats[thread.id] || { reply_count: 0, participant_count: 0, vote_score: 0 }}
             isMe={thread.profile_id === profile.id}
             myVote={myVotes[thread.id] || 0}
             onVote={val => handleVote(thread.id, val)}
             onClick={() => onOpenThread(thread)}
+            onReport={
+              thread.profile_id !== profile.id
+                ? () => setReportTarget({ threadId: thread.id })
+                : undefined
+            }
           />
         ))}
       </div>
+
+      {/* ── Modal signalement thread ── */}
+      {reportTarget && (
+        <ReportModal
+          threadId={reportTarget.threadId}
+          reporterId={profile.id}
+          onClose={() => setReportTarget(null)}
+          onSuccess={() => setReportTarget(null)}
+        />
+      )}
     </div>
   )
 }

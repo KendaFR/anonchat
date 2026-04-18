@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 const TYPE_LABELS = {
-  mention:        '💬 t\'a mentionné',
-  reply_in_thread:'🗨️ nouvelle réponse',
-  new_thread:     '🆕 nouveau thread',
+  mention:         '💬 t\'a mentionné',
+  reply_in_thread: '🗨️ nouvelle réponse',
+  new_thread:      '🆕 nouveau thread',
+  system:          '📢 Message système',
+  warning:         '⚠️ Avertissement',
 }
 
 export default function NotificationPanel({
@@ -12,8 +14,8 @@ export default function NotificationPanel({
   markRead, markAllRead, deleteNotif,
   profile, onClose, onOpenThread
 }) {
-  const [prefs, setPrefs] = useState({})  // { [thread_id]: { all_replies: bool } }
-  const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'unread'
+  const [prefs, setPrefs] = useState({})
+  const [activeFilter, setActiveFilter] = useState('all')
 
   useEffect(() => { loadPrefs() }, [profile.id])
 
@@ -37,20 +39,21 @@ export default function NotificationPanel({
     setPrefs(prev => ({ ...prev, [threadId]: { all_replies: newVal } }))
   }
 
-  // Grouper les notifs par thread
   const filtered = notifications.filter(n =>
     activeFilter === 'all' ? true : !n.is_read
   )
 
+  // Grouper par thread (les notifs system/warning n'ont pas de thread_id)
   const grouped = filtered.reduce((acc, n) => {
-    if (!acc[n.thread_id]) acc[n.thread_id] = { threadContent: n.threads?.content, items: [] }
-    acc[n.thread_id].items.push(n)
+    const key = n.thread_id || '__system__'
+    if (!acc[key]) acc[key] = { threadContent: n.threads?.content || null, isSystem: !n.thread_id, items: [] }
+    acc[key].items.push(n)
     return acc
   }, {})
 
   function handleNotifClick(notif) {
     markRead(notif.id)
-    onOpenThread(notif.thread_id)
+    if (notif.thread_id) onOpenThread(notif.thread_id)
   }
 
   function truncate(str, len = 60) {
@@ -60,12 +63,9 @@ export default function NotificationPanel({
 
   return (
     <>
-      {/* Backdrop */}
       <div className="notif-backdrop" onClick={onClose} />
 
-      {/* Panneau */}
       <div className="notif-panel">
-        {/* Header */}
         <div className="notif-header">
           <div>
             <h2>Notifications</h2>
@@ -86,7 +86,6 @@ export default function NotificationPanel({
           </div>
         </div>
 
-        {/* Filtres */}
         <div className="notif-filters">
           <button className={`notif-filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
             onClick={() => setActiveFilter('all')}>Toutes</button>
@@ -94,7 +93,6 @@ export default function NotificationPanel({
             onClick={() => setActiveFilter('unread')}>Non lues</button>
         </div>
 
-        {/* Contenu */}
         <div className="notif-body">
           {loading && <div className="notif-empty">Chargement…</div>}
 
@@ -105,25 +103,27 @@ export default function NotificationPanel({
             </div>
           )}
 
-          {Object.entries(grouped).map(([threadId, group]) => (
-            <div key={threadId} className="notif-group">
-              {/* Header du groupe thread */}
+          {Object.entries(grouped).map(([key, group]) => (
+            <div key={key} className="notif-group">
               <div className="notif-group-header">
                 <span className="notif-group-title">
-                  📌 {truncate(group.threadContent, 45) || 'Thread supprimé'}
+                  {group.isSystem
+                    ? '📢 Notifications système'
+                    : `📌 ${truncate(group.threadContent, 45) || 'Thread supprimé'}`}
                 </span>
-                <button
-                  className={`notif-pref-toggle ${(prefs[threadId]?.all_replies ?? true) ? 'on' : 'off'}`}
-                  onClick={() => toggleThreadPref(threadId)}
-                  title={(prefs[threadId]?.all_replies ?? true)
-                    ? 'Toutes les réponses notifiées — cliquer pour ne garder que les mentions'
-                    : 'Mentions seulement — cliquer pour tout recevoir'}
-                >
-                  {(prefs[threadId]?.all_replies ?? true) ? '🔔' : '🔕'}
-                </button>
+                {!group.isSystem && (
+                  <button
+                    className={`notif-pref-toggle ${(prefs[key]?.all_replies ?? true) ? 'on' : 'off'}`}
+                    onClick={() => toggleThreadPref(key)}
+                    title={(prefs[key]?.all_replies ?? true)
+                      ? 'Toutes les réponses — cliquer pour mentions seulement'
+                      : 'Mentions seulement — cliquer pour tout recevoir'}
+                  >
+                    {(prefs[key]?.all_replies ?? true) ? '🔔' : '🔕'}
+                  </button>
+                )}
               </div>
 
-              {/* Items du groupe */}
               {group.items.map(notif => (
                 <div
                   key={notif.id}
@@ -131,14 +131,20 @@ export default function NotificationPanel({
                   onClick={() => handleNotifClick(notif)}
                 >
                   <div className="notif-item-left">
-                    {notif.replies?.profiles && (
-                      <div className="avatar-sm"
-                        style={{ background: notif.replies.profiles.color }}>
+                    {notif.replies?.profiles ? (
+                      <div className="avatar-sm" style={{ background: notif.replies.profiles.color }}>
                         {notif.replies.profiles.emoji}
+                      </div>
+                    ) : (
+                      <div className="avatar-sm" style={{ background: '#EEEDFE', fontSize: 16 }}>
+                        {notif.type === 'warning' ? '⚠️' : '📢'}
                       </div>
                     )}
                     <div className="notif-item-content">
-                      <div className="notif-type-label">{TYPE_LABELS[notif.type]}</div>
+                      <div className="notif-type-label">{TYPE_LABELS[notif.type] || notif.type}</div>
+                      {notif.message && (
+                        <div className="notif-preview">"{truncate(notif.message, 60)}"</div>
+                      )}
                       {notif.replies?.content && (
                         <div className="notif-preview">"{truncate(notif.replies.content, 50)}"</div>
                       )}
@@ -159,7 +165,8 @@ export default function NotificationPanel({
                       title="Supprimer">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6l-1 14H6L5 6"/>
                       </svg>
                     </button>
                   </div>

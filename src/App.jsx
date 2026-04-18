@@ -7,15 +7,17 @@ import ThreadScreen         from './components/ThreadScreen'
 import ProfileScreen        from './components/ProfileScreen'
 import EditProfileScreen    from './components/EditProfileScreen'
 import NotificationPanel    from './components/NotificationPanel'
+import AdminPanel           from './components/AdminPanel'
 import './App.css'
 
 export default function App() {
   const { profile, setProfile, saveProfile, clearProfile, loading } = useSession()
   const notifs = useNotifications(profile?.id)
 
-  const [screen, setScreen]           = useState('feed')
-  const [activeThread, setActiveThread] = useState(null)
+  const [screen, setScreen]               = useState('feed')
+  const [activeThread, setActiveThread]   = useState(null)
   const [showNotifPanel, setShowNotifPanel] = useState(false)
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
 
   if (loading) {
     return (
@@ -26,26 +28,46 @@ export default function App() {
   }
 
   if (!profile) {
+    return <div className="app-container"><OnboardingScreen onJoin={saveProfile} /></div>
+  }
+
+  // Vérifie si le compte est suspendu
+  if (profile.status === 'suspended_perm') {
     return (
       <div className="app-container">
-        <OnboardingScreen onJoin={saveProfile} />
+        <div className="suspended-screen">
+          <div style={{ fontSize: 48 }}>🚫</div>
+          <h2>Compte suspendu</h2>
+          <p>Ton compte a été suspendu définitivement suite à une violation des règles.</p>
+          <button className="btn-danger" onClick={clearProfile}>Effacer mes données locales</button>
+        </div>
       </div>
     )
   }
 
-  function openThread(thread) {
-    setActiveThread(thread)
-    setScreen('thread')
+  if (profile.status === 'suspended_temp') {
+    const until = profile.suspended_until
+      ? new Date(profile.suspended_until).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })
+      : '...'
+    return (
+      <div className="app-container">
+        <div className="suspended-screen">
+          <div style={{ fontSize: 48 }}>⏸️</div>
+          <h2>Compte suspendu temporairement</h2>
+          <p>Ton compte est suspendu jusqu'au <strong>{until}</strong>.</p>
+        </div>
+      </div>
+    )
   }
 
-  // Ouvre un thread depuis une notification
+  function openThread(thread) { setActiveThread(thread); setScreen('thread') }
   function openThreadFromNotif(threadId) {
     setShowNotifPanel(false)
-    // On a besoin de l'objet thread complet — on le cherche dans le cache feed
-    // ou on navigue et ThreadScreen le chargera
     setActiveThread({ id: threadId, _needsLoad: true })
     setScreen('thread')
   }
+
+  const canAdmin = profile.role === 'admin' || profile.role === 'moderator'
 
   return (
     <div className="app-container">
@@ -56,6 +78,7 @@ export default function App() {
           onOpenProfile={() => setScreen('profile')}
           unreadCount={notifs.unreadCount}
           onOpenNotifs={() => setShowNotifPanel(true)}
+          onOpenAdmin={canAdmin ? () => setShowAdminPanel(true) : null}
         />
       )}
       {screen === 'thread' && (
@@ -81,13 +104,19 @@ export default function App() {
         />
       )}
 
-      {/* Panneau notifications (overlay) */}
       {showNotifPanel && (
         <NotificationPanel
           {...notifs}
           profile={profile}
           onClose={() => setShowNotifPanel(false)}
           onOpenThread={openThreadFromNotif}
+        />
+      )}
+
+      {showAdminPanel && canAdmin && (
+        <AdminPanel
+          profile={profile}
+          onClose={() => setShowAdminPanel(false)}
         />
       )}
     </div>

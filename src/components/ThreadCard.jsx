@@ -1,4 +1,6 @@
-export default function ThreadCard({ thread, stats, isMe, myVote, onVote, onClick }) {
+import RoleBadge from './RoleBadge'
+
+export default function ThreadCard({ thread, stats, isMe, myVote, onVote, onClick, onReport }) {
   const author = thread.profiles
   const score  = Number(stats.vote_score ?? 0)
   const time   = new Date(thread.created_at).toLocaleString('fr-FR', {
@@ -6,6 +8,7 @@ export default function ThreadCard({ thread, stats, isMe, myVote, onVote, onClic
   })
 
   function handleVoteClick(e, val) { e.stopPropagation(); onVote(val) }
+  function handleReport(e)         { e.stopPropagation(); onReport?.() }
 
   const scoreColor = score > 0 ? 'var(--green)' : score < 0 ? 'var(--red)' : 'var(--text-muted)'
 
@@ -19,9 +22,19 @@ export default function ThreadCard({ thread, stats, isMe, myVote, onVote, onClic
           <span className="thread-author-name">
             {author?.emoji} · {author?.age} ans
             {isMe && <span className="badge-me">moi</span>}
+            <RoleBadge role={author?.role} />
           </span>
           <span className="thread-time">{time}</span>
         </div>
+        {!isMe && (
+          <button className="report-btn" onClick={handleReport} title="Signaler ce thread">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+              <line x1="4" y1="22" x2="4" y2="15"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       <p className="thread-content">{thread.content}</p>
@@ -54,7 +67,7 @@ export default function ThreadCard({ thread, stats, isMe, myVote, onVote, onClic
             stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          {stats.reply_count} réponse{stats.reply_count !== 1 ? 's' : ''}
+          {stats.reply_count}
         </span>
         <span className="thread-stat">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
