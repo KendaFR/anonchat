@@ -1,33 +1,34 @@
 import { useState } from 'react'
 import { Analytics } from '@vercel/analytics/react'
 import { useSession } from './hooks/useSession'
+
 import OnboardingScreen from './components/OnboardingScreen'
-import FeedScreen      from './components/FeedScreen'
-import ThreadScreen    from './components/ThreadScreen'
-import ProfileScreen   from './components/ProfileScreen'
+import FeedScreen from './components/FeedScreen'
+import ThreadScreen from './components/ThreadScreen'
+import ProfileScreen from './components/ProfileScreen'
 import EditProfileScreen from './components/EditProfileScreen'
+
 import './App.css'
 
 export default function App() {
   const { profile, setProfile, saveProfile, clearProfile, loading } = useSession()
-  const [screen, setScreen]         = useState('feed')       // feed | thread | profile | edit
-  const [activeThread, setActiveThread] = useState(null)     // objet thread sélectionné
 
+  const [screen, setScreen] = useState('feed') // feed | thread | profile | edit
+  const [activeThread, setActiveThread] = useState(null)
+
+  // 🔹 Loading
   if (loading) {
     return (
-  <div className="app-container">
-    {loading ? (
-      <SplashScreen />
-    ) : !profile ? (
-      <OnboardingScreen onJoin={saveProfile} />
-    ) : (
-      <AppContent ... />
-    )}
-    <Analytics />
-  </div>
-)
+      <div className="app-container">
+        <div className="splash">
+          <div className="splash-emoji">💬</div>
+          <div className="splash-text">Chargement…</div>
+        </div>
+      </div>
+    )
   }
 
+  // 🔹 Onboarding (pas de profil)
   if (!profile) {
     return (
       <div className="app-container">
@@ -37,11 +38,13 @@ export default function App() {
     )
   }
 
+  // 🔹 Navigation thread
   function openThread(thread) {
     setActiveThread(thread)
     setScreen('thread')
   }
 
+  // 🔹 App principale
   return (
     <div className="app-container">
       {screen === 'feed' && (
@@ -51,6 +54,7 @@ export default function App() {
           onOpenProfile={() => setScreen('profile')}
         />
       )}
+
       {screen === 'thread' && (
         <ThreadScreen
           thread={activeThread}
@@ -58,6 +62,7 @@ export default function App() {
           onBack={() => setScreen('feed')}
         />
       )}
+
       {screen === 'profile' && (
         <ProfileScreen
           profile={profile}
@@ -66,13 +71,18 @@ export default function App() {
           onDelete={clearProfile}
         />
       )}
+
       {screen === 'edit' && (
         <EditProfileScreen
           profile={profile}
-          onSave={(updated) => { setProfile(updated); setScreen('profile') }}
+          onSave={(updated) => {
+            setProfile(updated)
+            setScreen('profile')
+          }}
           onBack={() => setScreen('profile')}
         />
       )}
+
       <Analytics />
     </div>
   )
