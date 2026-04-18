@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { useSession } from './hooks/useSession'
 import OnboardingScreen from './components/OnboardingScreen'
 import ChatScreen from './components/ChatScreen'
@@ -18,6 +19,7 @@ export default function App() {
           <div className="splash-emoji">💬</div>
           <div className="splash-text">Chargement…</div>
         </div>
+        <Analytics />
       </div>
     )
   }
@@ -27,6 +29,7 @@ export default function App() {
     return (
       <div className="app-container">
         <OnboardingScreen onJoin={saveProfile} />
+        <Analytics />
       </div>
     )
   }
@@ -54,6 +57,7 @@ export default function App() {
           onBack={() => setScreen('profile')}
         />
       )}
+      <Analytics />
     </div>
   )
 }
