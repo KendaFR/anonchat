@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession }       from './hooks/useSession'
 import { useNotifications } from './hooks/useNotifications'
 import OnboardingScreen     from './components/OnboardingScreen'
@@ -14,15 +14,33 @@ export default function App() {
   const { profile, setProfile, saveProfile, clearProfile, loading } = useSession()
   const notifs = useNotifications(profile?.id)
 
-  const [screen, setScreen]               = useState('feed')
-  const [activeThread, setActiveThread]   = useState(null)
+  const [screen, setScreen]                 = useState('feed')
+  const [activeThread, setActiveThread]     = useState(null)
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
+  const [warningPopup, setWarningPopup]     = useState(null) // { message } | null
+
+  // Détecte les nouvelles notifs warning/system non lues pour popup
+  useEffect(() => {
+    if (!notifs.notifications.length) return
+    const latest = notifs.notifications[0]
+    if (!latest.is_read && (latest.type === 'warning' || latest.type === 'system')) {
+      setWarningPopup({ message: latest.message, type: latest.type, id: latest.id })
+    }
+  }, [notifs.notifications])
+
+  function dismissWarning() {
+    if (warningPopup?.id) notifs.markRead(warningPopup.id)
+    setWarningPopup(null)
+  }
 
   if (loading) {
     return (
       <div className="app-container">
-        <div className="splash"><div className="splash-emoji">💬</div><div className="splash-text">Chargement…</div></div>
+        <div className="splash">
+          <div className="splash-emoji">💬</div>
+          <div className="splash-text">Chargement…</div>
+        </div>
       </div>
     )
   }
@@ -31,34 +49,8 @@ export default function App() {
     return <div className="app-container"><OnboardingScreen onJoin={saveProfile} /></div>
   }
 
-  // Vérifie si le compte est suspendu
-  if (profile.status === 'suspended_perm') {
-    return (
-      <div className="app-container">
-        <div className="suspended-screen">
-          <div style={{ fontSize: 48 }}>🚫</div>
-          <h2>Compte suspendu</h2>
-          <p>Ton compte a été suspendu définitivement suite à une violation des règles.</p>
-          <button className="btn-danger" onClick={clearProfile}>Effacer mes données locales</button>
-        </div>
-      </div>
-    )
-  }
-
-  if (profile.status === 'suspended_temp') {
-    const until = profile.suspended_until
-      ? new Date(profile.suspended_until).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })
-      : '...'
-    return (
-      <div className="app-container">
-        <div className="suspended-screen">
-          <div style={{ fontSize: 48 }}>⏸️</div>
-          <h2>Compte suspendu temporairement</h2>
-          <p>Ton compte est suspendu jusqu'au <strong>{until}</strong>.</p>
-        </div>
-      </div>
-    )
-  }
+  // Les comptes suspendus peuvent accéder à l'app en lecture seule
+  // La restriction d'envoi est gérée dans FeedScreen et ThreadScreen
 
   function openThread(thread) { setActiveThread(thread); setScreen('thread') }
   function openThreadFromNotif(threadId) {
@@ -117,7 +109,33 @@ export default function App() {
         <AdminPanel
           profile={profile}
           onClose={() => setShowAdminPanel(false)}
+          onOpenThread={(threadId) => {
+            setShowAdminPanel(false)
+            setActiveThread({ id: threadId, _needsLoad: true })
+            setScreen('thread')
+          }}
         />
+      )}
+
+      {/* Popup warning/système — apparaît automatiquement à la réception */}
+      {warningPopup && (
+        <>
+          <div className="modal-backdrop" onClick={dismissWarning} />
+          <div className="modal warning-popup">
+            <div className="warning-popup-icon">
+              {warningPopup.type === 'warning' ? '⚠️' : '📢'}
+            </div>
+            <div className="warning-popup-title">
+              {warningPopup.type === 'warning' ? 'Avertissement de modération' : 'Message de l\'équipe'}
+            </div>
+            <div className="warning-popup-message">
+              {warningPopup.message || 'Merci de respecter les règles de la communauté.'}
+            </div>
+            <button className="btn-primary" onClick={dismissWarning}>
+              J'ai compris
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
