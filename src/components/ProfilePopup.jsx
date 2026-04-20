@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { PASSIONS } from './OnboardingScreen'
 import RoleBadge from './RoleBadge'
+import ReputationButton from './ReputationButton'
 
-// Hiérarchie des rôles — plus le chiffre est élevé, plus le rôle est puissant
+// Hiérarchie des rôles
 export const ROLE_POWER = {
   user:      0,
   moderator: 1,
@@ -14,11 +15,13 @@ export function canViewId(viewerRole) {
 }
 
 export default function ProfilePopup({ profile, viewer, onClose }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied]   = useState(false)
+  const [score, setScore]     = useState(profile?.reputation_score ?? 0)
 
   if (!profile) return null
 
-  const showId = canViewId(viewer?.role)
+  const showId   = canViewId(viewer?.role)
+  const isSelf   = viewer?.id === profile.id
 
   function copyId() {
     navigator.clipboard.writeText(profile.id)
@@ -57,10 +60,27 @@ export default function ProfilePopup({ profile, viewer, onClose }) {
                   month: 'long', year: 'numeric'
                 })}
               </div>
+
+              {/* Score de réputation */}
+              <div className="rep-score-row">
+                <span className="rep-score-icon">⭐</span>
+                <span className="rep-score-value">{score}</span>
+                <span className="rep-score-label">réputation</span>
+              </div>
             </div>
           </div>
 
-          {/* ID visible uniquement pour les modérateurs et admins */}
+          {/* Bouton recommander (pas sur son propre profil) */}
+          {viewer && !isSelf && (
+            <ReputationButton
+              viewer={viewer}
+              targetId={profile.id}
+              targetScore={score}
+              onVoted={() => setScore(s => s + 1)}
+            />
+          )}
+
+          {/* ID visible pour les modérateurs+ */}
           {showId && (
             <div className="profile-popup-id-block">
               <div className="profile-popup-id-label">

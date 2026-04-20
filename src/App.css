@@ -894,3 +894,42 @@ strong { font-weight: 500; }
   transition: all .15s;
 }
 .btn-copy-id:hover { background: var(--border); color: var(--text); }
+
+/* ─── RÉPUTATION ─────────────────────────────────────── */
+.rep-score-row {
+  display: flex; align-items: center; gap: 5px; margin-top: 4px;
+}
+.rep-score-icon { font-size: 13px; }
+.rep-score-value {
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.rep-score-label { font-size: 12px; color: var(--text-muted); }
+
+/* Bouton recommander */
+.rep-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 10px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: transparent;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  color: var(--text-muted); transition: all .15s;
+}
+.rep-btn:disabled { opacity: .45; cursor: default; }
+.rep-btn.can-vote {
+  border-color: #F59E0B; color: #92400E; background: #FEF3C7;
+}
+.rep-btn.can-vote:hover { background: #FDE68A; }
+.rep-btn.voted {
+  border-color: var(--green); color: var(--green); background: #D1FAE5;
+}
+
+/* ─── RÔLES — BOUTONS SET_ROLE ADMIN ─────────────────── */
+.btn-role-sm {
+  padding: 5px 10px; border-radius: 20px; font-size: 12px;
+  cursor: pointer; font-weight: 500; border: 1px solid; transition: all .15s;
+}
+.btn-role-modo  { border-color: #F59E0B; background: #FEF3C7; color: #92400E; }
+.btn-role-modo:hover  { background: #FDE68A; }
+.btn-role-admin { border-color: #FF4444; background: #FFE5E5; color: #991B1B; }
+.btn-role-admin:hover { background: #FFCCCC; }
+.btn-role-user  { border-color: var(--border); background: var(--bg); color: var(--text-muted); }
+.btn-role-user:hover  { border-color: var(--text-muted); }

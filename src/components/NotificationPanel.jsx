@@ -7,6 +7,7 @@ const TYPE_LABELS = {
   new_thread:      '🆕 nouveau thread',
   system:          '📢 Message système',
   warning:         '⚠️ Avertissement',
+  reputation:      '⭐ Point de réputation reçu',
 }
 
 export default function NotificationPanel({
@@ -108,7 +109,9 @@ export default function NotificationPanel({
               <div className="notif-group-header">
                 <span className="notif-group-title">
                   {group.isSystem
-                    ? '📢 Notifications système'
+                    ? group.items.some(n => n.type === 'reputation')
+                        ? '⭐ Réputation & Système'
+                        : '📢 Notifications système'
                     : `📌 ${truncate(group.threadContent, 45) || 'Thread supprimé'}`}
                 </span>
                 {!group.isSystem && (
@@ -137,7 +140,7 @@ export default function NotificationPanel({
                       </div>
                     ) : (
                       <div className="avatar-sm" style={{ background: '#EEEDFE', fontSize: 16 }}>
-                        {notif.type === 'warning' ? '⚠️' : '📢'}
+                        {notif.type === 'warning' ? '⚠️' : notif.type === 'reputation' ? '⭐' : '📢'}
                       </div>
                     )}
                     <div className="notif-item-content">

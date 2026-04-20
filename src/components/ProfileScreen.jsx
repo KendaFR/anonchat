@@ -70,6 +70,11 @@ export default function ProfileScreen({ profile, onBack, onEdit, onDelete }) {
               <RoleBadge role={profile.role} size="md" />
             </div>
             <div className="profile-age">{profile.age} ans</div>
+            <div className="rep-score-row">
+              <span className="rep-score-icon">⭐</span>
+              <span className="rep-score-value">{profile.reputation_score ?? 0}</span>
+              <span className="rep-score-label">réputation</span>
+            </div>
           </div>
         </div>
 

@@ -145,6 +145,9 @@ export default function AdminPanel({ profile, onClose, onOpenThread }) {
       setWorking(false)
       return
 
+    } else if (action === 'set_role' && isAdmin) {
+      await supabase.from('profiles').update({ role: extra.role }).eq('id', target.id)
+
     } else if (action === 'send_warning') {
       await supabase.from('notifications').insert({
         recipient_id: target.id,
@@ -395,6 +398,29 @@ export default function AdminPanel({ profile, onClose, onOpenThread }) {
                         onClick={() => runAction('unsuspend', targetProfile)}>
                         ✅ Lever
                       </button>
+                    )}
+                    {/* Gestion des rôles — admins uniquement, pas sur soi-même */}
+                    {isAdmin && targetProfile.id !== profile.id && (
+                      <>
+                        {targetProfile.role !== 'moderator' && (
+                          <button className="btn-role-sm btn-role-modo"
+                            onClick={() => runAction('set_role', targetProfile, { role: 'moderator' })}>
+                            🛡️ Rendre Modo
+                          </button>
+                        )}
+                        {targetProfile.role !== 'admin' && (
+                          <button className="btn-role-sm btn-role-admin"
+                            onClick={() => runAction('set_role', targetProfile, { role: 'admin' })}>
+                            ⚡ Rendre Admin
+                          </button>
+                        )}
+                        {targetProfile.role !== 'user' && (
+                          <button className="btn-role-sm btn-role-user"
+                            onClick={() => runAction('set_role', targetProfile, { role: 'user' })}>
+                            👤 Retirer le rôle
+                          </button>
+                        )}
+                      </>
                     )}
                     {isAdmin && (
                       <button className="btn-danger-solid"
